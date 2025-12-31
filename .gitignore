@@ -1,0 +1,46 @@
+# Environment and secrets
+.env
+*.env
+.env.local
+.env.production
+api_keys.json
+secrets.json
+
+# Trading data
+family_trades.csv
+*.csv
+trade_history.json
+positions.json
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.bak
+*.backup
+
+# Configuration (keep template)
+config.yaml
+!config.example.yaml
