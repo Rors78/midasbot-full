@@ -2,6 +2,21 @@
 
 A sophisticated multi-phase cryptocurrency trading bot designed for Kraken and Binance US exchanges.
 
+## 🇺🇸 USA Regulatory Compliant
+
+**MADE FOR US TRADERS - FULLY COMPLIANT WITH US REGULATIONS**
+
+This bot is specifically designed to meet US regulatory requirements:
+- ✅ **SPOT TRADING ONLY** (no futures, no derivatives)
+- ✅ **LONG POSITIONS ONLY** (no shorting)
+- ✅ **NO LEVERAGE** (100% compliant with US regulations)
+- ✅ **US EXCHANGES ONLY** (Binance US, Kraken US)
+- ✅ **Regulatory Compliant** for US retail traders
+
+**Hard to find USA-compliant trading bots?** This is one of the few automated bots built specifically for US regulatory compliance.
+
+---
+
 ## Overview
 
 MidasBot operates with **multiple trading phases** controlled by a single intelligent system:
