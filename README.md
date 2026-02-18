@@ -17,6 +17,8 @@ This bot is specifically designed to meet US regulatory requirements:
 
 ---
 
+> **API keys are optional.** Paper/read-only mode uses the public REST API — no account or key required. Keys are only needed for live order execution.
+
 ## Overview
 
 MidasBot operates with **multiple trading phases** controlled by a single intelligent system:
@@ -39,20 +41,38 @@ MidasBot operates with **multiple trading phases** controlled by a single intell
 
 ## Installation
 
-```bash
+**Windows:**
+```powershell
 pip install ccxt python-dotenv pyyaml
+```
+
+**Linux/macOS:**
+```bash
+pip3 install ccxt python-dotenv pyyaml
 ```
 
 ## Quick Start
 
 ### Paper Trading (Safe Mode)
-```bash
+**Windows:**
+```powershell
 python MidasBot_Full.py --exchange kraken --pair BTC/USD --budget 50
 ```
 
-### Live Trading (Advanced)
+**Linux/macOS:**
 ```bash
+python3 MidasBot_Full.py --exchange kraken --pair BTC/USD --budget 50
+```
+
+### Live Trading (Advanced)
+**Windows:**
+```powershell
 python MidasBot_Full.py --exchange kraken --pair BTC/USD --budget 50 --live --confirm I-UNDERSTAND
+```
+
+**Linux/macOS:**
+```bash
+python3 MidasBot_Full.py --exchange kraken --pair BTC/USD --budget 50 --live --confirm I-UNDERSTAND
 ```
 
 **Warning**: Live trading requires API keys and confirmation flag.
@@ -104,8 +124,14 @@ fees:
 ```
 
 Then run:
-```bash
+**Windows:**
+```powershell
 python MidasBot_Full.py --config config.yaml
+```
+
+**Linux/macOS:**
+```bash
+python3 MidasBot_Full.py --config config.yaml
 ```
 
 ## Trading Phases
@@ -149,8 +175,14 @@ All trades are automatically logged to CSV with:
 ## Testing
 
 Dry run mode for testing configuration:
-```bash
+**Windows:**
+```powershell
 python MidasBot_Full.py --config config.yaml --dryrun
+```
+
+**Linux/macOS:**
+```bash
+python3 MidasBot_Full.py --config config.yaml --dryrun
 ```
 
 ## Example Workflows
