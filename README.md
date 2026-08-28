@@ -1,240 +1,152 @@
-# MidasBot — Full Squad, Single Brain
+# MidasBot v2.3 — Full Squad, Single Brain
 
-A sophisticated multi-phase cryptocurrency trading bot designed for Kraken and Binance US exchanges.
+A multi-pair, multi-phase cryptocurrency **paper-trading** bot for Kraken,
+with leveraged margin simulation, a real fill engine, a dark-mode live
+dashboard, backtesting, and walk-forward parameter search — in one Python file.
 
-## 🇺🇸 USA Regulatory Compliant
+<img src="midasbot_preview.png" width="120" align="right" alt="MidasBot logo">
 
-**MADE FOR US TRADERS - FULLY COMPLIANT WITH US REGULATIONS**
+![dashboard](docs/dashboard.jpg)
 
-This bot is specifically designed to meet US regulatory requirements:
-- ✅ **SPOT TRADING ONLY** (no futures, no derivatives)
-- ✅ **LONG POSITIONS ONLY** (no shorting)
-- ✅ **NO LEVERAGE** (100% compliant with US regulations)
-- ✅ **US EXCHANGES ONLY** (Binance US, Kraken US)
-- ✅ **Regulatory Compliant** for US retail traders
+## Scope — read this first
 
-**Hard to find USA-compliant trading bots?** This is one of the few automated bots built specifically for US regulatory compliance.
+- **Paper trading only.** Live order execution is not implemented; `--live`
+  always falls back to paper. No API keys required — everything runs on
+  Kraken's public REST API.
+- **Long positions only** (no shorting). Sells only ever close held inventory.
+- **Leveraged margin simulation** — each pair trades at Kraken's catalog max
+  leverage by default, with margin open fees, rollover, and forced
+  liquidation modeled. `--leverage N` overrides; `--leverage 1` = spot.
+- **Honest books.** Resting limit orders fill only when a real candle's
+  high/low crosses them. Losses, liquidations, sunk fees, and rollover are
+  all counted — the P/L log is measurement, not fiction.
 
----
+## Quick start
 
-> **API keys are optional.** Paper/read-only mode uses the public REST API — no account or key required. Keys are only needed for live order execution.
-
-## Overview
-
-MidasBot operates with **multiple trading phases** controlled by a single intelligent system:
-- **SCOUT** - Market analysis and entry detection
-- **LUNCHBOX** - Mean-reversion strategy
-- **REGULAR** - Grid trading
-- **AFTERBURNER** - Momentum trading
-- **DIP** - Pullback DCA (Dollar Cost Averaging)
-
-## Features
-
-- **Multi-Exchange Support**: Kraken and Binance US via ccxt
-- **Paper Trading Mode**: Safe simulation mode (default)
-- **Live Trading**: Optional live trading with safety confirmations
-- **Budget Management**: Budget, fee, and minimum notional aware
-- **Post-Only Orders**: Price padding to avoid taker fees
-- **Trade Logging**: Automatic CSV logging to `family_trades.csv`
-- **Technical Indicators**: EMA and RSI calculations built-in
-- **YAML Configuration**: Flexible configuration via YAML files
-
-## Installation
-
-**Windows:**
-```powershell
+```
 pip install ccxt python-dotenv pyyaml
+python MidasBot_Full.py --pairs all --budget 160
 ```
 
-**Linux/macOS:**
-```bash
-pip3 install ccxt python-dotenv pyyaml
+That launches all 16 catalog pairs ($10 margin each), serves the dashboard
+at `http://127.0.0.1:8901`, and opens it in your browser. Single pair:
+
+```
+python MidasBot_Full.py --pair BTC/USD --budget 50
 ```
 
-## Quick Start
+(Windows: `python`. Linux/macOS/Pydroid3: `python3`.)
 
-### Paper Trading (Safe Mode)
-**Windows:**
-```powershell
-python MidasBot_Full.py --exchange kraken --pair BTC/USD --budget 50
+## The brain
+
+Every tick the bot classifies the market from EMA(12/48) slope, RSI(14),
+and ATR%. Phase switches require `--hyst` consecutive agreeing ticks:
+
+| Phase | Regime | Behavior |
+|-------|--------|----------|
+| SCOUT | no edge | stand aside, cancel resting entries |
+| LUNCHBOX | flat + quiet | mean-revert grid of buy levels |
+| REGULAR | flat + volatile | balanced grid |
+| AFTERBURNER | trending up | momentum entry at touch, TP at 1.5× spacing |
+| DIP | oversold, not crashing | pullback DCA buys |
+
+Every filled lot gets a take-profit (one spacing step) and an optional stop
+(`--stop-mult` × spacing below entry). At leverage, a lot whose loss reaches
+80% of its margin is force-closed and booked as `LIQ`.
+
+## Pair catalog (Kraken margin, max leverage)
+
+`--pairs "AVAX/USD,LTC/USD"` runs one brain per pair (budget split evenly,
+per-pair state files, shared trade log); `--pairs all` runs the full catalog.
+The tick auto-slows with pair count to respect API rate limits.
+
+| Pair | Lev | | Pair | Lev | | Pair | Lev | | Pair | Lev |
+|------|-----|-|------|-----|-|------|-----|-|------|-----|
+| AVAX | 10x | | UNI | 5x | | SHIB | 5x | | HBAR | 5x |
+| LTC | 10x | | CRV | 5x | | TRX | 5x | | PEPE | 5x |
+| USDC | 10x | | AAVE | 5x | | BCH | 5x | | ALGO | 5x |
+| WLD | 3x | | NEAR | 5x | | DOT | 5x | | RENDER | 5x |
+
+Position notional = margin × leverage; fees are charged on notional, plus a
+0.02% margin open fee and 0.02%/4h rollover. `net_pct` in the trade log is
+**return on margin**.
+
+## Dashboard
+
+Dark-mode web UI served by the bot itself (`--web PORT`, default 8901;
+`--no-open` to skip the browser launch). Totals cards, a live total-equity
+chart (10s samples, session-start baseline, crosshair tooltip), per-pair
+table (leverage, phase, price, equity, notional, uP/L, rP/L, drawdown), and
+recent round trips with liquidations highlighted. Built not to lie: every
+pair shows its data age and flags **STALE** rather than freezing numbers,
+unmeasured prices show `--` rather than 0, and a dead bot reads
+**DISCONNECTED** instead of pretending.
+
+## Measurement
+
+```
+python MidasBot_Full.py --pairs all --budget 160 --backtest 7
+python MidasBot_Full.py --pairs "AVAX/USD,PEPE/USD" --budget 40 --sweep 7
+python MidasBot_Full.py --report family_trades.csv
 ```
 
-**Linux/macOS:**
-```bash
-python3 MidasBot_Full.py --exchange kraken --pair BTC/USD --budget 50
-```
+- **`--backtest DAYS`** replays real Kraken candles through the *exact* live
+  brain — same regimes, fills, leverage, fees, rollover, liquidation — and
+  prints per-pair results, regime occupancy, and a per-phase expectancy
+  table. Writes `backtest_trades.csv`; never touches live state.
+- **`--sweep DAYS`** maps the parameter space: every spacing (0.5–2%) ×
+  stop (2/3/6/off) × leverage (1x, catalog max) combo is ranked on the first
+  70% of history, then the top 3 re-run on the unseen last 30%. Verdicts:
+  **HELD UP**, **OVERFIT**, or **UNVALIDATED**. In-sample rank alone is
+  curve fitting; even a holdout pass only means "survived once". Picking
+  parameters remains the operator's call.
+- **`--report [CSV]`** prints win%, avg win/loss, profit factor, and
+  expectancy per trade, grouped by pair and phase, from any trade log.
 
-### Live Trading (Advanced)
-**Windows:**
-```powershell
-python MidasBot_Full.py --exchange kraken --pair BTC/USD --budget 50 --live --confirm I-UNDERSTAND
-```
+## Fee viability
 
-**Linux/macOS:**
-```bash
-python3 MidasBot_Full.py --exchange kraken --pair BTC/USD --budget 50 --live --confirm I-UNDERSTAND
-```
+A grid round trip books one spacing step. At Kraken's 0.25% maker fee the
+**default 0.5% spacing cannot clear round-trip costs** — the startup banner
+shows exactly which phases are viable at your settings, and sweep results
+consistently favor 1.2–2% spacing. Widen `--spacing` (or override fees with
+`--maker`/`--taker` if your tier is better) before expecting activity.
 
-**Warning**: Live trading requires API keys and confirmation flag.
-
-## Configuration
-
-### Environment Variables (.env)
-```env
-BINANCEUS_API_KEY=your_key_here
-BINANCEUS_SECRET=your_secret_here
-KRAKEN_API_KEY=your_key_here
-KRAKEN_SECRET=your_secret_here
-MIDAS_LOG=family_trades.csv
-```
-
-### Command Line Parameters
+## Flags
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--exchange` | kraken or binanceus | - |
-| `--pair` | Trading pair (e.g., BTC/USD) | BTC/USD |
-| `--budget` | USD budget cap | 50 |
-| `--grids` | Grid levels | 8 |
-| `--spacing` | Spacing between levels (fraction) | 0.005 (0.5%) |
-| `--min-net` | Minimum net step after fees | 0.002 (0.20%) |
-| `--tick` | Loop interval in seconds | 15 |
-| `--paper` | Paper trading mode | true |
-| `--live` | Live trading mode | false |
-| `--confirm` | Required with --live | - |
-| `--config` | Path to YAML config file | - |
-| `--dryrun` | Simulate one cycle and exit | false |
+| `--pair` | Single trading pair | BTC/USD |
+| `--pairs` | Comma-separated list, or `all` for the catalog | — |
+| `--budget` | Total margin budget (split across pairs) | 50 |
+| `--leverage` | Override leverage, 1 = spot | catalog max |
+| `--grids` | Grid levels per pair | 8 |
+| `--spacing` | Level spacing as fraction | 0.005 |
+| `--stop-mult` | Stop = mult × spacing below entry (0 disables) | 3.0 |
+| `--min-net` | Min net step after fees for a phase to trade | 0.002 |
+| `--hyst` | Consecutive ticks to switch phase | 3 |
+| `--tick` | Loop seconds (auto-slows in multi-pair) | 15 |
+| `--web` / `--no-open` | Dashboard port (0 off) / don't open browser | 8901 |
+| `--state` / `--fresh` | State file path / discard saved state | midas_state.json |
+| `--log` / `--equity-log` | Trade log / equity curve CSV | family_trades.csv |
+| `--backtest DAYS` | Historical replay, then exit | off |
+| `--sweep DAYS` | Walk-forward parameter search, then exit | off |
+| `--report [CSV]` | Expectancy report, then exit | off |
+| `--config` | YAML overriding any of the above | — |
+| `--dryrun` | One tick, then exit | false |
 
-### YAML Configuration
+## Persistence
 
-Create a YAML file to override defaults:
+State (cash, lots, resting orders, realized P/L) is saved atomically every
+tick to `midas_state.json` (per-pair files in multi-pair mode) and restored
+on restart — a restart never wipes the book. `--fresh` starts over. Trades
+append to `family_trades.csv`; equity marks to `equity_curve.csv`.
 
-```yaml
-exchange: kraken
-pair: BTC/USD
-budget: 100
-grids: 10
-spacing: 0.005
-min_net: 0.002
-tick: 15
-mode: paper
-fees:
-  manual_maker: 0.0016
-  manual_taker: 0.0026
-```
+## ⚠️ Disclaimer
 
-Then run:
-**Windows:**
-```powershell
-python MidasBot_Full.py --config config.yaml
-```
-
-**Linux/macOS:**
-```bash
-python3 MidasBot_Full.py --config config.yaml
-```
-
-## Trading Phases
-
-### SCOUT Phase
-Analyzes market conditions and identifies optimal entry points.
-
-### LUNCHBOX Phase (Mean-Reversion)
-Capitalizes on price returning to mean after deviation.
-
-### REGULAR Phase (Grid Trading)
-Places multiple buy/sell orders at defined price intervals.
-
-### AFTERBURNER Phase (Momentum)
-Exploits strong trending moves with momentum-based entries.
-
-### DIP Phase (Pullback DCA)
-Dollar-cost averaging during price pullbacks.
-
-## Trade Logging
-
-All trades are automatically logged to CSV with:
-- Timestamp
-- Exchange
-- Pair
-- Side (buy/sell)
-- Amount
-- Price
-- Phase
-- Mode (paper/live)
-
-## Safety Features
-
-- **Paper Mode Default**: All trading is simulated unless explicitly enabled
-- **Confirmation Required**: Live trading requires `--confirm I-UNDERSTAND` flag
-- **Budget Caps**: Enforced spending limits
-- **Post-Only Orders**: Attempts to avoid taker fees
-- **Fee Awareness**: Calculates profitability after fees
-- **Minimum Notional**: Respects exchange minimums
-
-## Testing
-
-Dry run mode for testing configuration:
-**Windows:**
-```powershell
-python MidasBot_Full.py --config config.yaml --dryrun
-```
-
-**Linux/macOS:**
-```bash
-python3 MidasBot_Full.py --config config.yaml --dryrun
-```
-
-## Example Workflows
-
-### Conservative Grid Bot on Kraken
-```bash
-python MidasBot_Full.py \
-  --exchange kraken \
-  --pair BTC/USD \
-  --budget 100 \
-  --grids 12 \
-  --spacing 0.003 \
-  --paper
-```
-
-### Live Trading on Binance US (Advanced)
-```bash
-python MidasBot_Full.py \
-  --exchange binanceus \
-  --pair BTC/USDT \
-  --budget 500 \
-  --live \
-  --confirm I-UNDERSTAND
-```
-
-## Indicators
-
-Built-in technical analysis:
-- **EMA (Exponential Moving Average)**: Trend detection
-- **RSI (Relative Strength Index)**: Overbought/oversold conditions
-
-## Requirements
-
-- Python 3.7+
-- ccxt
-- python-dotenv
-- pyyaml
-
-## ⚠️ Risk Disclaimer
-
-Cryptocurrency trading carries significant risk. This bot is provided for educational purposes. Always:
-- Test in paper mode first
-- Start with small amounts
-- Understand the strategies
-- Never invest more than you can afford to lose
-- Monitor the bot regularly
-- Keep API keys secure
+For education and strategy research. Paper results — including leveraged
+paper results — do not predict live performance. Backtests are historical
+replay, not prediction.
 
 ## License
 
-Provided as-is for personal use and learning.
-
----
-
-**Built for mobile-first development with Pydroid3**
+MIT — see [LICENSE](LICENSE).

@@ -11,6 +11,11 @@ family_trades.csv
 *.csv
 trade_history.json
 positions.json
+midas_state*.json
+*.json.tmp
+dbg_*.txt
+run_out.txt
+run_err.txt
 
 # Logs
 *.log
